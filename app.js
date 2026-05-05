@@ -6,6 +6,18 @@ const crypto = require("crypto");
 const sessions = new Map(); // token → session data
 const SESSION_TTL = 1000; // 1 second (short for testing)
 
+const bcrypt = require("bcrypt");
+
+const SALT_ROUNDS = 10;
+
+function hashPassword(password) {
+  return bcrypt.hashSync(password, SALT_ROUNDS);
+}
+
+async function verifyPassword(password, hash) {
+  return await bcrypt.compare(password, hash);
+}
+
 const users = new Map();
 
 // seed users
@@ -23,10 +35,6 @@ users.set("user@example.com", {
   email: "user@example.com",
   passwordHash: hashPassword("correctpassword"),
 });
-
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
-}
 
 function constantTimeCompare(a, b) {
   const bufA = Buffer.from(a);
@@ -51,7 +59,9 @@ function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
 
-app.post("/login", (req, res) => {
+// User Login
+
+app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   if (
@@ -66,15 +76,14 @@ app.post("/login", (req, res) => {
   }
 
   const validEmail = normalizeEmail(email);
-  const inputHash = hashPassword(password);
   const user = users.get(validEmail);
   let passwordValid = false;
 
   if (user) {
-    passwordValid = constantTimeCompare(inputHash, user.passwordHash);
+    passwordValid = await verifyPassword(password, user.passwordHash);
   } else {
     // still do dummy compare for timing safety
-    constantTimeCompare(inputHash, DUMMY_HASH);
+    await verifyPassword(password, DUMMY_HASH);
   }
 
   if (user && passwordValid) {
@@ -94,6 +103,8 @@ app.post("/login", (req, res) => {
     error: "invalid_credentials",
   });
 });
+
+// User's Profile
 
 app.get("/profile", (req, res) => {
   const token = req.headers["authorization"];
@@ -118,6 +129,8 @@ app.get("/profile", (req, res) => {
   });
 });
 
+// User Logout
+
 app.post("/logout", (req, res) => {
   const token = req.headers["authorization"];
 
@@ -135,6 +148,47 @@ app.post("/logout", (req, res) => {
   sessions.delete(token);
 
   return res.status(200).json({ message: "logged_out" });
+});
+
+// User Registration
+
+app.post("/register", async (req, res) => {
+  let { email, password } = req.body;
+
+  // ✅ normalize
+  if (typeof email === "string") {
+    email = email.trim().toLowerCase();
+  }
+
+  // ✅ validate
+  if (
+    !isValidEmail(email) ||
+    typeof password !== "string" ||
+    password.length < 8
+  ) {
+    return res.status(400).json({
+      error: "invalid_input",
+    });
+  }
+
+  // ✅ check duplicate
+  if (users.has(email)) {
+    return res.status(409).json({
+      error: "email_exists",
+    });
+  }
+
+  // ✅ create user
+  const passwordHash = hashPassword(password);
+
+  users.set(email, {
+    email,
+    passwordHash,
+  });
+
+  return res.status(201).json({
+    message: "user_created",
+  });
 });
 
 module.exports = app;

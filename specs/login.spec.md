@@ -168,3 +168,57 @@ THEN:
 CONSTRAINT:
 
 - user lookup must not break timing consistency invariant
+
+RULE 13: User Registration
+
+IF:
+
+- email and password are valid
+- email does not already exist
+
+THEN:
+
+- create new user
+- store password securely (hashed)
+- return 201
+
+---
+
+RULE 14: Duplicate Email
+
+IF:
+
+- email already exists
+
+THEN:
+
+- return 409
+- error "email_exists"
+
+---
+
+RULE 15: Registration Validation
+
+IF:
+
+- input is invalid
+
+THEN:
+
+- return 400
+- error "invalid_input"
+
+RULE 16: Password Hashing
+
+IF:
+
+- password is stored
+
+THEN:
+
+- it must be hashed using a slow, salted algorithm
+
+CONSTRAINTS:
+
+- hashing must be resistant to brute-force attacks
+- plain-text passwords must never be stored

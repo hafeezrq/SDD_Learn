@@ -235,3 +235,43 @@ describe("Multiple Users", () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+describe("User Registration", () => {
+  test("can register a new user", async () => {
+    const res = await request(app).post("/register").send({
+      email: "newuser@example.com",
+      password: "newpassword123",
+    });
+
+    expect(res.statusCode).toBe(201);
+  });
+
+  test("cannot register duplicate email", async () => {
+    await request(app).post("/register").send({
+      email: "dup@example.com",
+      password: "password123",
+    });
+
+    const res = await request(app).post("/register").send({
+      email: "dup@example.com",
+      password: "password123",
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error).toBe("email_exists");
+  });
+
+  test("registered user can login", async () => {
+    await request(app).post("/register").send({
+      email: "loginuser@example.com",
+      password: "password123",
+    });
+
+    const res = await request(app).post("/login").send({
+      email: "loginuser@example.com",
+      password: "password123",
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
